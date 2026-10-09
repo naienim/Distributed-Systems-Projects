@@ -1,0 +1,215 @@
+Scenario 4: Effect of Network Delay
+
+Goal:
+The goal of this scenario is to study how artificial replication delay affects eventual consistency and strong consistency.
+
+The experiment was repeated with three delay values:
+
+0 ms
+500 ms
+2000 ms
+
+For each delay, both eventual consistency and strong consistency were tested.
+
+Delay = 0 ms
+
+Setup:
+replication_delay_ms was set to 0 in all three replica configuration files.
+
+Eventual consistency PUT:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s4_e_0 -value 100 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+updated_replicas = 1
+
+PUT latency:
+24.230 ms
+
+Immediate GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_e_0 -mode eventual
+
+Observed result:
+Replica 2 returned the new value immediately.
+
+GET latency:
+8.413 ms
+
+GET from Replica 2 after convergence:
+7.786 ms
+
+GET from Replica 3 after convergence:
+7.942 ms
+
+Stale reads:
+0
+
+Convergence time:
+Almost immediate.
+
+Strong consistency PUT:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s4_s_0 -value 100 -mode strong
+
+Observed result:
+The PUT operation succeeded.
+updated_replicas = 3
+
+PUT latency:
+33.476 ms
+
+Strong GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_s_0 -mode strong
+
+Observed result:
+Replica 2 returned the newest version.
+checked_replicas = 3
+
+GET latency:
+38.045 ms
+
+Delay = 500 ms
+
+Setup:
+replication_delay_ms was set to 500 in all three replica configuration files.
+
+Eventual consistency PUT:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s4_e_500 -value 100 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+updated_replicas = 1
+
+PUT latency:
+26.723 ms
+
+Immediate GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_e_500 -mode eventual
+
+Observed result:
+Replica 2 returned the new value in this run.
+
+GET latency:
+7.720 ms
+
+GET from Replica 2 after convergence:
+8.042 ms
+
+GET from Replica 3 after convergence:
+7.892 ms
+
+Stale reads:
+0
+
+Convergence time:
+Less than 1 second.
+
+Strong consistency PUT:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s4_s_500 -value 100 -mode strong
+
+Observed result:
+The PUT operation succeeded.
+updated_replicas = 3
+
+PUT latency:
+542.737 ms
+
+Strong GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_s_500 -mode strong
+
+Observed result:
+Replica 2 returned the newest version.
+checked_replicas = 3
+
+GET latency:
+42.323 ms
+
+Delay = 2000 ms
+
+Setup:
+replication_delay_ms was set to 2000 in all three replica configuration files.
+
+Eventual consistency PUT:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s4_e_2000 -value 100 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+updated_replicas = 1
+
+PUT latency:
+23.782 ms
+
+Immediate GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_e_2000 -mode eventual
+
+Observed result:
+Replica 2 returned key not found.
+This was a stale read because replication had not completed yet.
+
+GET latency:
+8.011 ms
+
+Stale reads:
+1
+
+GET from Replica 2 after convergence:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_e_2000 -mode eventual
+
+Observed result:
+Replica 2 returned the new value.
+
+GET latency:
+7.538 ms
+
+GET from Replica 3 after convergence:
+
+go run client/main.go -op get -replica http://localhost:8003 -key s4_e_2000 -mode eventual
+
+Observed result:
+Replica 3 returned the new value.
+
+GET latency:
+7.992 ms
+
+Convergence time:
+About 2 to 3 seconds.
+
+Strong consistency PUT:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s4_s_2000 -value 100 -mode strong
+
+Observed result:
+The PUT operation succeeded.
+updated_replicas = 3
+
+PUT latency:
+2041.933 ms
+
+Strong GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s4_s_2000 -mode strong
+
+Observed result:
+Replica 2 returned the newest version.
+checked_replicas = 3
+
+GET latency:
+10.573 ms
+
+Final Analysis:
+In eventual consistency mode, PUT latency stayed low even when replication delay increased. This happened because the client did not wait for replication to finish. However, the convergence time increased as the delay increased. With 2000 ms delay, an immediate GET from Replica 2 returned key not found, showing a stale read.
+
+In strong consistency mode, PUT latency increased directly with the replication delay because the client waited for acknowledgement from other replicas. With 0 ms delay, strong PUT latency was low. With 500 ms delay, it increased to about 542 ms. With 2000 ms delay, it increased to about 2042 ms.
+
+Conclusion:
+Network delay affects eventual consistency mainly by increasing convergence time and the probability of stale reads. It affects strong consistency mainly by increasing PUT latency.

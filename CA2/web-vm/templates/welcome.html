@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome</title>
+    <link rel="stylesheet" href="../static/style.css">
+</head>
+<body>
+    <h1>Welcome, {{.Username}}!</h1>
+    <p>Login successful.</p>
+
+    <h2>Text file from VM3 through RPC:</h2>
+    <p>{{.TextContent}}</p>
+
+    <h2>Image from VM3 through RPC:</h2>
+    <img src="{{.ImageData}}" alt="Remote Image" width="400">
+
+</body>
+</html>

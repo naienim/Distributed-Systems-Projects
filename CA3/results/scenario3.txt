@@ -1,0 +1,136 @@
+Scenario 3: Concurrent Conflict
+
+Goal:
+The goal of this scenario is to show how the system handles concurrent conflicting writes.
+
+Setup:
+All three replicas were running.
+The replication delay was set to a high value to make it possible to write different values for the same key on two replicas before replication completed.
+
+Part 1: First PUT on Replica 1
+
+Command:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s3_conflict -value 10 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+Replica 1 stored:
+
+key = s3_conflict
+value = 10
+version = 1
+updated_by = replica1
+
+PUT latency:
+25.570 ms
+
+Part 2: Concurrent PUT on Replica 2
+
+Command:
+
+go run client/main.go -op put -replica http://localhost:8002 -key s3_conflict -value 20 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+Replica 2 stored:
+
+key = s3_conflict
+value = 20
+version = 1
+updated_by = replica2
+
+PUT latency:
+19.993 ms
+
+Conflict:
+Both writes created records with the same key and the same version, but with different values.
+
+Replica 1:
+s3_conflict = 10, version = 1, updated_by = replica1
+
+Replica 2:
+s3_conflict = 20, version = 1, updated_by = replica2
+
+This is a real conflict.
+
+Part 3: Read Before Conflict Resolution
+
+Read from Replica 1:
+
+go run client/main.go -op get -replica http://localhost:8001 -key s3_conflict -mode eventual
+
+Observed result:
+Replica 1 returned value = 10.
+This was its local value before conflict resolution.
+
+GET latency from Replica 1:
+8.572 ms
+
+Read from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s3_conflict -mode eventual
+
+Observed result:
+Replica 2 returned value = 20.
+This was its local value before conflict resolution.
+
+GET latency from Replica 2:
+7.305 ms
+
+Part 4: Read After Conflict Resolution
+
+After waiting for replication to complete, the key was read again from all replicas.
+
+Read from Replica 1:
+
+go run client/main.go -op get -replica http://localhost:8001 -key s3_conflict -mode eventual
+
+Observed result:
+Replica 1 returned value = 20, updated_by = replica2.
+
+GET latency:
+7.822 ms
+
+Read from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s3_conflict -mode eventual
+
+Observed result:
+Replica 2 returned value = 20, updated_by = replica2.
+
+GET latency:
+7.818 ms
+
+Read from Replica 3:
+
+go run client/main.go -op get -replica http://localhost:8003 -key s3_conflict -mode eventual
+
+Observed result:
+Replica 3 returned value = 20, updated_by = replica2.
+
+GET latency:
+7.986 ms
+
+Conflict Resolution Policy:
+The system uses the following conflict resolution policy:
+
+1. Higher version wins.
+2. If versions are equal, the record with the larger updated_by replica ID wins.
+3. If both are equal, the newer timestamp wins.
+
+In this scenario, both records had version = 1.
+Therefore, the system compared updated_by.
+Since replica2 is greater than replica1, the value written by Replica 2 won.
+
+Final value:
+s3_conflict = 20
+
+Convergence time:
+About 4 to 5 seconds.
+
+Stale reads:
+0
+
+Conclusion:
+This scenario successfully created a concurrent conflict. Before resolution, Replica 1 had value 10 and Replica 2 had value 20. After replication and conflict resolution, all replicas converged to value 20. This shows that the conflict resolution policy is deterministic and allows the system to converge.

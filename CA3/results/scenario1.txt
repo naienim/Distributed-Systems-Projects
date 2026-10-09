@@ -1,0 +1,66 @@
+Scenario 1: Temporary Inconsistency
+
+Goal:
+The goal of this scenario is to show temporary inconsistency in eventual consistency mode.
+
+Setup:
+All three replicas were running independently.
+The replication delay was set to 4000 ms to make temporary inconsistency visible.
+
+Commands and Observations:
+
+1. PUT on Replica 1:
+
+go run client/main.go -op put -replica http://localhost:8001 -key x -value 10 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+The value x=10 was stored on Replica 1.
+The response showed updated_replicas = 1.
+This means that the value was applied locally first, while replication was still running asynchronously.
+
+PUT latency:
+28.106 ms
+
+2. Immediate GET from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key x -mode eventual
+
+Observed result:
+Replica 2 returned key not found.
+HTTP status was 404 Not Found.
+This happened because Replica 2 had not received the replication message yet.
+
+Immediate GET latency from Replica 2:
+7.877 ms
+
+Stale reads:
+1
+
+3. GET from Replica 2 after waiting:
+
+go run client/main.go -op get -replica http://localhost:8002 -key x -mode eventual
+
+Observed result:
+Replica 2 returned x=10.
+This means that the replication message reached Replica 2.
+
+GET latency after convergence from Replica 2:
+8.370 ms
+
+4. GET from Replica 3 after waiting:
+
+go run client/main.go -op get -replica http://localhost:8003 -key x -mode eventual
+
+Observed result:
+Replica 3 also returned x=10.
+This means that the system converged.
+
+GET latency after convergence from Replica 3:
+9.116 ms
+
+Convergence time:
+About 4 seconds.
+
+Conclusion:
+This scenario successfully showed temporary inconsistency in eventual consistency mode. Immediately after the PUT operation, Replica 2 did not have the new value and returned key not found. After replication completed, Replica 2 and Replica 3 both returned the correct value. This demonstrates that eventual consistency may allow stale reads for a short time, but replicas eventually converge.

@@ -1,0 +1,7 @@
+{
+  "id": "replica1",
+  "port": 8001,
+  "peers": ["http://localhost:8002", "http://localhost:8003"],
+  "replication_delay_ms": 2000,
+  "data_file": "results/replica1_data.json"
+}

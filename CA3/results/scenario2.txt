@@ -1,0 +1,114 @@
+Scenario 2: Replica Failure
+
+Goal:
+The goal of this scenario is to compare eventual consistency and strong consistency when one replica fails.
+
+Setup:
+All three replicas were started.
+Replica 3 was then stopped using Ctrl + C.
+After that, only Replica 1 and Replica 2 remained active.
+
+Part 1: Eventual Consistency with One Failed Replica
+
+Command:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s2_eventual -value 100 -mode eventual
+
+Observed result:
+The PUT operation succeeded.
+The response showed updated_replicas = 1.
+This means that the value was first applied locally on Replica 1 and replication continued asynchronously.
+
+PUT latency:
+23.080 ms
+
+Read from Replica 1:
+
+go run client/main.go -op get -replica http://localhost:8001 -key s2_eventual -mode eventual
+
+Observed result:
+Replica 1 returned s2_eventual=100.
+
+GET latency from Replica 1:
+7.858 ms
+
+Read from Replica 2 after waiting:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s2_eventual -mode eventual
+
+Observed result:
+Replica 2 returned s2_eventual=100.
+This means that Replica 2 received the replication message.
+
+GET latency from Replica 2:
+7.642 ms
+
+Read from Replica 3:
+
+go run client/main.go -op get -replica http://localhost:8003 -key s2_eventual -mode eventual
+
+Observed result:
+The request failed with connection refused because Replica 3 was stopped.
+
+Conclusion for eventual consistency:
+The system still accepted the PUT operation even though Replica 3 was down. Replica 1 stored the value and Replica 2 received it later. This shows that eventual consistency provides higher availability, but the failed replica cannot receive updates while it is down.
+
+Part 2: Strong Consistency with One Failed Replica
+
+Command:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s2_strong -value 200 -mode strong
+
+Observed result:
+The PUT operation succeeded.
+The response showed updated_replicas = 2.
+This means that Replica 1 and Replica 2 formed a majority.
+
+PUT latency:
+4043.415 ms
+
+Read from Replica 2:
+
+go run client/main.go -op get -replica http://localhost:8002 -key s2_strong -mode strong
+
+Observed result:
+Replica 2 returned s2_strong=200.
+The response showed checked_replicas = 2.
+
+GET latency from Replica 2:
+15.162 ms
+
+Conclusion for strong consistency with one failed replica:
+The strong PUT operation succeeded because a majority was still available. With three replicas, the majority is two replicas. Since Replica 1 and Replica 2 were running, the system could commit the update.
+
+Part 3: Strong Consistency without Majority
+
+Replica 2 was also stopped.
+Only Replica 1 remained active.
+
+Command:
+
+go run client/main.go -op put -replica http://localhost:8001 -key s2_strong_fail -value 300 -mode strong
+
+Observed result:
+The PUT operation failed.
+HTTP status was 503 Service Unavailable.
+The response message was:
+PUT failed: majority of replicas is not available
+
+updated_replicas:
+1
+
+PUT latency:
+4019.684 ms
+
+Then the key was read:
+
+go run client/main.go -op get -replica http://localhost:8001 -key s2_strong_fail -mode strong
+
+Observed result:
+The result was key not found.
+This means that the failed strong PUT was not committed.
+
+Final Conclusion:
+Eventual consistency was more available because it accepted a write even when one replica was down. Strong consistency succeeded when a majority was available, but failed when only one replica remained active. This scenario demonstrates the trade-off between availability and consistency.
